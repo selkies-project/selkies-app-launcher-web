@@ -98,15 +98,19 @@ class BrokerApp {
         this.status = "checking";
         // Build launch params.
         this.waitLaunch = true;
-        var launchParams = this.getLaunchParams();
-        this.broker.start_app(this.name, launchParams, (resp) => {
-            if (resp.status === 401 || resp.status === 0) {
-                vue_app.reload_dialog = true;
-                return;
-            }
-            clearTimeout(this.update_timeout);
-            this.update(true);
-        });
+
+        // Make sure we start with fresh params.
+        this.fetchConfig().then(() =>{
+            var launchParams = this.getLaunchParams();
+            this.broker.start_app(this.name, launchParams, (resp) => {
+                if (resp.status === 401 || resp.status === 0) {
+                    vue_app.reload_dialog = true;
+                    return;
+                }
+                clearTimeout(this.update_timeout);
+                this.update(true);
+            });
+        })
     }
 
     shutdown() {
@@ -216,16 +220,19 @@ class BrokerApp {
     fetchConfig() {
         if (this.type !== "statefulset") return;
         this.saveStatus = "idle";
-        this.broker.get_config(this.name, (data) => {
-            if (data.status !== undefined && data.status !== 200 && data.status !== 503) {
-                vue_app.reload_dialog = true;
-                return;
-            }
-            this.imageRepo = data.imageRepo;
-            this.imageTag = data.imageTag;
-            this.imageTags = data.tags;
-            this.nodeTier = data.nodeTier;
-            this.setParamValues(data.params);
+        return new Promise((resolve, reject) => {
+            this.broker.get_config(this.name, (data) => {
+                if (data.status !== undefined && data.status !== 200 && data.status !== 503) {
+                    vue_app.reload_dialog = true;
+                    return;
+                }
+                this.imageRepo = data.imageRepo;
+                this.imageTag = data.imageTag;
+                this.imageTags = data.tags;
+                this.nodeTier = data.nodeTier;
+                this.setParamValues(data.params);
+                resolve();
+            }, () => { reject() });
         });
     }
 }
@@ -236,17 +243,28 @@ var vue_app = new Vue({
     components: {
         ScaleLoader
     },
-    vuetify: new Vuetify(),
-    created() {
-        this.$vuetify.theme.dark = true
-    },
+    vuetify: new Vuetify({
+        theme: {
+            dark: getStorageItem("launcher", "darkTheme", "false") === "true",
+            themes: {
+                light: {
+                    primary: '#2196f3',
+                    secondary: '#b0bec5',
+                    accent: '#8c9eff',
+                    error: '#b71c1c',
+                },
+                dark: {
+                    primary: '#424242',
+                }
+            }
+        }
+    }),
     data() {
         return {
             brokerName: "App Launcher",
             brokerRegion: "",
             user: "",
             logoutURL: "",
-            darkTheme: false,
             quickLaunchEnabled: false,
             quickLaunchText: "",
             reload_dialog: false,
@@ -256,6 +274,15 @@ var vue_app = new Vue({
 
             logoutFunction: () => {
                 window.location.href = this.logoutURL;
+            },
+
+            toggleTheme: () => {
+                this.$vuetify.theme.isDark = !this.$vuetify.theme.isDark;
+                setStorageItem("launcher", "darkTheme", this.$vuetify.theme.isDark.toString());
+            },
+
+            isDark: () => {
+                return this.$vuetify.theme.isDark;
             },
 
             launchDisabled: (app) => {
@@ -324,7 +351,7 @@ var fetchApps = () => {
         vue_app.brokerRegion = data.brokerRegion;
         vue_app.user = data.user;
         vue_app.logoutURL = data.logoutURL;
-        vue_app.$vuetify.theme.dark = data.brokerTheme === "dark";
+        //vue_app.$vuetify.theme.dark = data.brokerTheme === "dark";
 
         // Fetch app status.
         data.apps.forEach((item) => {

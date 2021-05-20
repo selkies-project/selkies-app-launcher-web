@@ -1,5 +1,29 @@
 # Pod broker web interface
 
+This repo lets you build and create a custom app launcher portal for Selkies.
+
+## Deployment
+
+1. Build the custom web image with Cloud Build:
+
+```bash
+PROJECT_ID=$(gcloud config get-value project)
+```
+
+```bash
+gcloud builds submit --project ${PROJECT_ID} -t gcr.io/${PROJECT_ID}/kube-pod-broker-custom-web:latest
+```
+
+2. Create a Secret Manager Secret to tell the core selkies repo not to use the image from the core selkies repo:
+
+```bash
+gcloud secrets create broker-web-image --replication-policy=automatic --data-file - <<EOF
+gcr.io/${PROJECT_ID}/kube-pod-broker-custom-web:latest
+EOF
+```
+
+3. From the Selkies core repo, run Cloud Build from the `setup/manifests` directory to deploy the updated web interface.
+
 ## Local development
 
 Requirements:
