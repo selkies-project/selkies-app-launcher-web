@@ -1,0 +1,16 @@
+{
+  "name": "selkies-app-launcher-web",
+  "version": "1.0.0",
+  "description": "## Local development",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "express": "^4.17.1",
+    "http-proxy": "^1.18.1",
+    "http-proxy-middleware": "^2.0.0"
+  }
+}
