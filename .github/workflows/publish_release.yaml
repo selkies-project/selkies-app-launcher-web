@@ -1,0 +1,63 @@
+name: Publish Release
+
+on:
+  push:
+    tags:
+    - 'v*'
+
+jobs:
+  ###
+  # Get release version from build context
+  ###
+  release_version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.vars.outputs.tag }}
+    steps:
+    - name: Set output
+      id: vars
+      run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
+    - name: Check output
+      env:
+        RELEASE_VERSION: ${{ steps.vars.outputs.tag }}
+      run: |
+        echo $RELEASE_VERSION
+        echo ${{ steps.vars.outputs.tag }}
+
+  ###
+  # App Launcher Web image
+  ###
+  app_launcher_web:
+    needs: release_version
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: ./.github/actions/build_and_publish_image
+      with:
+        use_cache: "true"
+        github_personal_access_token: ${{ secrets.GITHUB_TOKEN }}
+        github_username: ${{ github.actor }}
+        image_source_directory: ./
+        image_tag_1: ghcr.io/selkies-project/selkies-app-launcher-web/app-launcher-web:latest
+        image_tag_2: ghcr.io/selkies-project/selkies-app-launcher-web/app-launcher-web:${{ needs.release_version.outputs.tag }}
+
+  ###
+  # Create Github Release
+  ###
+  create_release:
+    runs-on: ubuntu-latest
+    needs:
+    - app_launcher_web
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: true
+        prerelease: false

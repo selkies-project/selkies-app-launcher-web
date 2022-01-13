@@ -1,0 +1,69 @@
+name: Build & publish changed images
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  ###
+  # Get release version from build context
+  ###
+  release_version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.vars.outputs.tag }}
+    steps:
+    - name: Set output
+      id: vars
+      run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
+    - name: Check output
+      env:
+        RELEASE_VERSION: ${{ steps.vars.outputs.tag }}
+      run: |
+        echo $RELEASE_VERSION
+        echo ${{ steps.vars.outputs.tag }}
+  detect_image_source_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      app_launcher_web_changed: ${{ steps.changes_to_app_launcher_web.outputs.any_changed == 'true' || steps.changes_to_app_launcher_web.outputs.any_deleted == 'true' }}
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 2 # This is for changed-files.
+    ###
+    # Detect changes to source files
+    ###
+    - id: changes_to_app_launcher_web
+      name: Check for file changes
+      uses: tj-actions/changed-files@v1.1.2
+      with:
+        files: |
+          ^src
+          ^config
+          ^Dockerfile$
+          package-lock.json
+          package.json
+          .github/workflows/build_and_publish_changed_images.yaml
+    - run: |
+        echo '${{ toJSON(steps.changes_to_app_launcher_web) }}'
+
+
+  ###
+  # App Launcher Web image
+  ###
+  build_app_launcher_web:
+    needs:
+    - release_version
+    - detect_image_source_changes
+    if: needs.detect_image_source_changes.outputs.app_launcher_web_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: ./.github/actions/build_and_publish_image
+      with:
+        use_cache: "true"
+        github_personal_access_token: ${{ secrets.GITHUB_TOKEN }}
+        github_username: ${{ github.actor }}
+        image_source_directory: ./
+        image_tag_1: ghcr.io/selkies-project/selkies-app-launcher-web/app-launcher-web:${{ needs.release_version.outputs.tag }}
