@@ -218,7 +218,7 @@ class BrokerApp {
     }
 
     fetchConfig() {
-        if (this.type !== "statefulset") return;
+        if (this.type !== "statefulset") return new Promise((resolve, reject) => {resolve()});
         this.saveStatus = "idle";
         return new Promise((resolve, reject) => {
             this.broker.get_config(this.name, (data) => {
